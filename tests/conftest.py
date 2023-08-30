@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-AMQP_URL = os.environ.get("AMQP_URL", "amqp://guest:guest@127.0.0.1/")
+AMQP_URL = os.environ.get("AMQP_URL", "amqp://guest:guest@localhost/")
 SERVICE_ID = os.environ.get("SERVICE_ID", "amqp-fabric")
 SERVICE_TYPE = os.environ.get("SERVICE_TYPE", "no-type")
 SERVICE_DOMAIN = os.environ.get("SERVICE_DOMAIN", "some-domain")

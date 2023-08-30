@@ -57,15 +57,21 @@ jobs:
 
   test:
     needs: prepare
+    services:
+      rabbitmq:
+        image: docker://mosquito/aiormq-rabbitmq
+        ports:
+          - 5672:5672
+          - 5671:5671
     strategy:
       matrix:
         python:
-        - "3.7"  # oldest Python supported by PSF
+        - "3.8"  # oldest Python supported by PSF
         - "3.11"  # newest Python that is stable
         platform:
         - ubuntu-latest
-        - macos-latest
-        - windows-latest
+        #- macos-latest
+        #- windows-latest
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v3
