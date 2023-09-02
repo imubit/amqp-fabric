@@ -4,6 +4,7 @@ import datetime as dt
 import pytest
 from aio_pika import IncomingMessage, connect_robust
 from aio_pika.exceptions import MessageProcessError
+from aio_pika.patterns.rpc import JsonRPCError
 from conftest import (
     AMQP_URL,
     RPC_EXCHANGE_NAME,
@@ -17,8 +18,14 @@ from amqp_fabric.amq_broker_connector import AmqBrokerConnector, JsonRPC
 
 
 class TestApi(AbstractServiceApi):
+    class SomeException(Exception):
+        pass
+
     def multiply(self, x, y):
         return x * y
+
+    def something_wrong(self):
+        raise TestApi.SomeException("there is a problem here")
 
 
 @pytest.mark.asyncio
@@ -64,6 +71,16 @@ async def test_rpc_server(event_loop):
         # Call invalid function
         with pytest.raises(MessageProcessError):
             await rpc.proxy.abc(x=100)
+
+        # Wrong argument
+        with pytest.raises(JsonRPCError):
+            await rpc.proxy.multiply(c=100)
+
+        # API exception
+        with pytest.raises(JsonRPCError) as exp:
+            await rpc.proxy.something_wrong()
+
+        assert exp.value.args[1]["error"]["type"] == "SomeException"
 
         # Cleanup
         await client_conn.close()
