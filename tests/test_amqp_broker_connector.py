@@ -14,7 +14,7 @@ from conftest import (
 )
 
 from amqp_fabric.abstract_service_api import AbstractServiceApi
-from amqp_fabric.amq_broker_connector import AmqBrokerConnector, JsonRPC
+from amqp_fabric.amq_broker_connector import AmqBrokerConnector, CustomJsonRPC
 
 
 class TestApi(AbstractServiceApi):
@@ -58,7 +58,7 @@ async def test_rpc_server(event_loop):
         # Creating channel
         channel = await client_conn.channel()
 
-        rpc = await JsonRPC.create(channel, exchange=RPC_EXCHANGE_NAME)
+        rpc = await CustomJsonRPC.create(channel, exchange=RPC_EXCHANGE_NAME)
 
         # Creates tasks by proxy object
         for i in range(100):
@@ -73,14 +73,17 @@ async def test_rpc_server(event_loop):
             await rpc.proxy.abc(x=100)
 
         # Wrong argument
-        with pytest.raises(JsonRPCError):
+        with pytest.raises(TypeError):
             await rpc.proxy.multiply(c=100)
 
         # API exception
         with pytest.raises(JsonRPCError) as exp:
             await rpc.proxy.something_wrong()
 
-        assert exp.value.args[1]["error"]["type"] == "SomeException"
+        assert (
+            exp.value.args[1]["error"]["type"]
+            == "test_amqp_broker_connector.SomeException"
+        )
 
         # Cleanup
         await client_conn.close()
@@ -112,7 +115,7 @@ async def test_rpc_server_invalid_exchange(event_loop):
         # Creating channel
         channel = await client_conn.channel()
 
-        rpc = await JsonRPC.create(channel, exchange="NON_EXIST")
+        rpc = await CustomJsonRPC.create(channel, exchange="NON_EXIST")
 
         # Creates tasks by proxy object
         with pytest.raises(MessageProcessError):

@@ -4,11 +4,14 @@ import json
 import re
 from functools import wraps
 from logging import getLogger
+from pydoc import locate
 from types import MethodType
 from typing import Any
 
 from aio_pika import ExchangeType, IncomingMessage, Message, connect_robust
+from aio_pika.abc import AbstractIncomingMessage
 from aio_pika.patterns import JsonRPC
+from aio_pika.patterns.rpc import JsonRPCError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from cachetools import TTLCache
@@ -16,7 +19,34 @@ from cachetools import TTLCache
 log = getLogger(__name__)
 
 
-class JsonGZipRPC(JsonRPC):
+class CustomJsonRPC(JsonRPC):
+    def serialize_exception(self, exception: Exception) -> Any:
+        return {
+            "error": {
+                "type": f"{exception.__module__}." f"{exception.__class__.__name__}"
+                if hasattr(exception, "__module__")
+                else exception.__class__.__name__,
+                "message": repr(exception),
+                "args": exception.args,
+            },
+        }
+
+    async def deserialize_message(
+        self,
+        message: AbstractIncomingMessage,
+    ) -> Any:
+        payload = await super().deserialize_message(message)
+        if isinstance(payload, JsonRPCError):
+            cls = locate(payload.args[1]["error"]["type"])
+            if cls:
+                payload = cls(
+                    payload.args[1]["error"]["message"],
+                    payload.args[1]["error"]["args"],
+                )
+        return payload
+
+
+class JsonGZipRPC(CustomJsonRPC):
     CONTENT_TYPE = "application/octet-stream"
 
     def serialize(self, data: Any) -> bytes:
@@ -179,7 +209,7 @@ class AmqBrokerConnector:
         channel = await self._broker_conn.channel()
         await channel.set_qos(prefetch_count=1)
 
-        rpc = await JsonRPC.create(
+        rpc = await CustomJsonRPC.create(
             channel, auto_delete=True, exchange=self._rpc_server_exchange_name
         )
 
@@ -200,7 +230,9 @@ class AmqBrokerConnector:
 
         # Creating channel
         channel = await self._broker_conn.channel()
-        rpc = await JsonRPC.create(channel, auto_delete=True, exchange=rpc_exchange)
+        rpc = await CustomJsonRPC.create(
+            channel, auto_delete=True, exchange=rpc_exchange
+        )
         return rpc.proxy
 
     def list_services(self, service_domain=None, service_type=None, health_check=True):
