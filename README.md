@@ -1,3 +1,9 @@
+[![Built Status](https://api.cirrus-ci.com/github/<USER>/daconnect-opc-ua.svg?branch=main)](https://cirrus-ci.com/github/<USER>/daconnect-opc-ua)
+[![ReadTheDocs](https://readthedocs.org/projects/daconnect-opc-ua/badge/?version=latest)](https://daconnect-opc-ua.readthedocs.io/en/stable/)
+[![Coveralls](https://img.shields.io/coveralls/github/<USER>/daconnect-opc-ua/main.svg)](https://coveralls.io/r/<USER>/daconnect-opc-ua)
+[![PyPI-Server](https://img.shields.io/pypi/v/daconnect-opc-ua.svg)](https://pypi.org/project/daconnect-opc-ua/)
+
+
 # amqp-fabric
 
 AMQP Fabric is an AMQP based microservice orchestration and communication framework.
