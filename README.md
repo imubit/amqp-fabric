@@ -10,15 +10,22 @@ AMQP Fabric is an AMQP based microservice orchestration and communication framew
 
 ## Description
 
-Microservice Bridge is a very simple microservice orchestration mechanism based on AMQ protocol.
+AMQP Fabric is a very simple microservice communication and orchestration mechanism based on AMQ protocol. Instead of
+relying on multiple technologies and orchestration frameworks - it's a "one-stop shop" library for implementing a
+light-weight microservices topology.
 
-It supports:
+Each service in the ecosystem can publish it's own API and use API of another service. A service can send an
+asynchronous stream of data that other services can subscribe to.
+Services can optionally send periodic "keep-alives" to allow tracking its uptime.
 
-* Micro-service communication via synchronous API (RPC)
+## Features
+
+* Microservice communication via synchronous API (RPC)
 * Asynchronous data transmission
 * Decentralized registry
-* Remote logging
+* Remote logging based on standard Python logging mechanism
 * High-availability
+* Secure and firewall friendly access from remote locations
 
 ## Installation
 
@@ -28,8 +35,19 @@ pip install amqp-fabric
 
 ## Getting Started
 
+Each service participating in the ecosystem is assigned with:
+ * "Domain" - (i.e. `project1`) any string identifying a group services communicating with each other. Different domains can co-exist under the same AMQP broker.
+ * "Service Type" - (i.e. `media_encoder`) - services holding the same service type, should have the same API.
+ * "Service Id" - (i.e. `encoder1`) Multiple services of the same type can be distinguished by a different Id.
+ * "Service Version" - evolution of the services and their API should be tracked by a version
 
-### Server Side
+### High Availability
+
+Multiple services with the same Domain, Type and Id - will create a high-availability "clique" - API calls will be
+redirected to the next available service.
+
+
+### Server Side Example
 
 
 ```python
@@ -85,7 +103,7 @@ if __name__ == "__main__":
 ```
 
 
-### Client Side
+### Client Side Example
 
 
 ```python
@@ -120,3 +138,20 @@ if __name__ == '__main__':
     loop.run_until_complete(task)
 
 ```
+
+
+### Uptime Tracking
+
+```amq.list_services``` will return a list of currently available services. The list can optionally be filtered, by
+service domain and/or service type.
+
+
+### Publishing and Subscribing to asynchronous data stream
+
+```amq.publish_data(items, headers)```
+
+```amq.subscribe_data(subscriber_name, headers, callback)```
+
+### Using logs
+
+TBD
