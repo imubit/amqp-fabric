@@ -1,5 +1,6 @@
+[![Built Status](https://api.cirrus-ci.com/github/imubit/amqp-fabric.svg?branch=main)](https://cirrus-ci.com/github/imubit/amqp-fabric)
 [![PyPI-Server](https://img.shields.io/pypi/v/amqp-fabric.svg)](https://pypi.org/project/amqp-fabric/)
-
+[![Coveralls](https://img.shields.io/coveralls/github/imubit/amqp-fabric/main.svg)](https://coveralls.io/r/imubit/amqp-fabric)
 
 # amqp-fabric
 
