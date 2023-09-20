@@ -1,7 +1,4 @@
-[![Built Status](https://api.cirrus-ci.com/github/<USER>/daconnect-opc-ua.svg?branch=main)](https://cirrus-ci.com/github/<USER>/daconnect-opc-ua)
-[![ReadTheDocs](https://readthedocs.org/projects/daconnect-opc-ua/badge/?version=latest)](https://daconnect-opc-ua.readthedocs.io/en/stable/)
-[![Coveralls](https://img.shields.io/coveralls/github/<USER>/daconnect-opc-ua/main.svg)](https://coveralls.io/r/<USER>/daconnect-opc-ua)
-[![PyPI-Server](https://img.shields.io/pypi/v/daconnect-opc-ua.svg)](https://pypi.org/project/daconnect-opc-ua/)
+[![PyPI-Server](https://img.shields.io/pypi/v/amqp-fabric.svg)](https://pypi.org/project/amqp-fabric/)
 
 
 # amqp-fabric
@@ -146,11 +143,20 @@ if __name__ == '__main__':
 service domain and/or service type.
 
 
-### Publishing and Subscribing to asynchronous data stream
+### Publishing and Subscribing to asynchronous data streams
 
-```amq.publish_data(items, headers)```
+Data can be published along with one or more headers which can later be used to filter the received messages:
 
-```amq.subscribe_data(subscriber_name, headers, callback)```
+```python
+amq.publish_data(items={'msg': 'Checkout committed', 'order_total': 55, 'products':['book']},
+                 headers={'msg_type': 'CUSTOMER_TRANSACTIONS', 'currency': 'USD'})
+```
+
+```python
+amq.subscribe_data(subscriber_name='accountant',
+                   headers={'msg_type': 'CUSTOMER_TRANSACTIONS'},
+                   callback=process_data)
+```
 
 ### Using logs
 
