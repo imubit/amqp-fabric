@@ -15,9 +15,7 @@ async def exec_multiply():
 
     srv_proxy = await amq.rpc_proxy("my_project", "my_app", "server_app")
 
-    result = await srv_proxy.func(
-        method_name="multiply", kwargs={"x": 5, "y": 7}, expiration=3
-    )
+    result = await srv_proxy.multiply(x=5, y=7)
     print(f"result = {result}")
 
     await amq.close()
