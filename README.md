@@ -1,10 +1,11 @@
-[![Built Status](https://api.cirrus-ci.com/github/imubit/amqp-fabric.svg?branch=main)](https://cirrus-ci.com/github/imubit/amqp-fabric)
 [![PyPI-Server](https://img.shields.io/pypi/v/amqp-fabric.svg)](https://pypi.org/project/amqp-fabric/)
 [![Coveralls](https://img.shields.io/coveralls/github/imubit/amqp-fabric/main.svg)](https://coveralls.io/r/imubit/amqp-fabric)
+[![Wheel](https://img.shields.io/pypi/wheel/amqp-fabric.svg)](https://pypi.python.org/pypi/amqp-fabric/)
+[![PyVersions](https://img.shields.io/pypi/pyversions/amqp-fabric.svg)](https://pypi.python.org/pypi/amqp-fabric/)
 
 # amqp-fabric
 
-AMQP Fabric is an AMQP based microservice orchestration and communication framework.
+AMQP Fabric is an AMQP based "one-stop-shop" microservice orchestration and communication framework.
 
 ## Description
 
@@ -12,7 +13,7 @@ AMQP Fabric is a very simple microservice communication and orchestration mechan
 relying on multiple technologies and orchestration frameworks - it's a "one-stop shop" library for implementing a
 light-weight microservices topology.
 
-Each service in the ecosystem can publish it's own API and use API of another service. A service can send an
+Each service in the ecosystem can publish its own API and use API of another service. A service can send an
 asynchronous stream of data that other services can subscribe to.
 Services can optionally send periodic "keep-alives" to allow tracking its uptime.
 
