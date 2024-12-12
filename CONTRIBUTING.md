@@ -367,5 +367,5 @@ on [PyPI], the following steps can be used to release a new version for
 ```{todo} Please review and change the following definitions:
 ```
 
-[repository]: https://github.com/<USERNAME>/amqp-fabric
-[issue tracker]: https://github.com/<USERNAME>/amqp-fabric/issues
+[repository]: https://github.com/imubit/amqp-fabric
+[issue tracker]: https://github.com/imubit/amqp-fabric/issues
