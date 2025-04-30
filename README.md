@@ -150,7 +150,12 @@ service domain and/or service type.
 Data can be published along with one or more headers which can later be used to filter the received messages:
 
 ```python
-amq.publish_data(items={'msg': 'Checkout committed', 'order_total': 55, 'products':['book']},
+
+items={'msg': 'Checkout committed', 'order_total': 55, 'products':['book']}
+
+encoded_msg = json.dumps(items, sort_keys=True, default=str).encode()
+
+amq.publish_data(encoded_msg,
                  headers={'msg_type': 'CUSTOMER_TRANSACTIONS', 'currency': 'USD'})
 ```
 

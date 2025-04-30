@@ -12,7 +12,7 @@ from amqp_fabric.logging_amqp_handler import AmqpHandler
 
 
 @pytest.mark.asyncio
-async def test_publish_log(event_loop):
+async def test_publish_log():
     srv_id = "test-srv"
     srv_type = "test-type"
     log_exchange_name = f"{SERVICE_DOMAIN}.log.records"
