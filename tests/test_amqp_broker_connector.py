@@ -1,5 +1,6 @@
 import asyncio
 import datetime as dt
+import json
 
 import pytest
 from aio_pika import IncomingMessage, connect_robust
@@ -29,7 +30,7 @@ class TestApi(AbstractServiceApi):
 
 
 @pytest.mark.asyncio
-async def test_rpc_server(event_loop):
+async def test_rpc_server():
     api = TestApi()
 
     srv_conn = AmqBrokerConnector(
@@ -44,7 +45,7 @@ async def test_rpc_server(event_loop):
     assert srv_conn.service_id == SERVICE_ID
     assert srv_conn.service_type == SERVICE_TYPE
     assert srv_conn.domain == SERVICE_DOMAIN
-    assert srv_conn.data_exchange == f"{SERVICE_DOMAIN}.daq.data"
+    assert srv_conn.data_exchange == f"{SERVICE_DOMAIN}.data"
 
     # Init server
     await srv_conn.rpc_register(api)
@@ -92,7 +93,7 @@ async def test_rpc_server(event_loop):
 
 
 @pytest.mark.asyncio
-async def test_rpc_server_invalid_exchange(event_loop):
+async def test_rpc_server_invalid_exchange():
     api = TestApi()
 
     srv_conn = AmqBrokerConnector(
@@ -128,7 +129,7 @@ async def test_rpc_server_invalid_exchange(event_loop):
 
 
 @pytest.mark.asyncio
-async def test_list_services(event_loop):
+async def test_list_services():
     srv_id = "test-srv"
     srv_type = "test-type"
     api = TestApi()
@@ -188,7 +189,7 @@ async def test_list_services(event_loop):
 
 
 @pytest.mark.asyncio
-async def test_keepalive_subscribe(event_loop):
+async def test_keepalive_subscribe():
     srv_id = "test-srv"
     srv_type = "test-type"
     api = TestApi()
@@ -232,7 +233,7 @@ async def test_keepalive_subscribe(event_loop):
 
 
 @pytest.mark.asyncio
-async def test_publish_data(event_loop):
+async def test_publish_data():
     srv_id = "test-srv"
     srv_type = "test-type"
     api = TestApi()
@@ -293,7 +294,9 @@ async def test_publish_data(event_loop):
         "field5": {"a": "b"},
     }
 
-    srv_conn.publish_data(msg, headers=publish_headers)
+    encoded_msg = json.dumps(msg, sort_keys=True, default=str).encode()
+
+    srv_conn.publish_data(encoded_msg, headers=publish_headers)
     await asyncio.sleep(0.1)
 
     assert message_received
@@ -301,13 +304,13 @@ async def test_publish_data(event_loop):
     # Test non existing header
     message_received = False
     publish_headers["header1"] = "non-existing"
-    srv_conn.publish_data(msg, headers=publish_headers)
+    srv_conn.publish_data(encoded_msg, headers=publish_headers)
     await asyncio.sleep(0.1)
 
     assert not message_received
 
     # callback_mock.assert_called_with(message='msg')
-    # assert _test_value['exchange'] == 'some-domain.daq.data'
+    # assert _test_value['exchange'] == 'some-domain.data'
     # assert _test_value['headers'] == {'header1': b'header_value', 'service_id': b'test-srv'}
 
     await srv_conn.close()

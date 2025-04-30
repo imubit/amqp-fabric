@@ -15,7 +15,7 @@ from amqp_fabric.amq_broker_connector import AmqBrokerConnector, JsonRPC
 
 
 @pytest.mark.asyncio
-async def test_response(event_loop):
+async def test_response():
     class TestApi:
         async def print_response_service(self, val):
             print(f"{datetime.now()}: {val} - start")

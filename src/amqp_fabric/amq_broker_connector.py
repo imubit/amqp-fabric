@@ -1,6 +1,7 @@
 import asyncio as aio
 import gzip
 import json
+import os
 import re
 from functools import wraps
 from logging import getLogger
@@ -57,10 +58,11 @@ class JsonGZipRPC(CustomJsonRPC):
 
 
 MSG_TYPE_KEEP_ALIVE = "keep_alive"
-MAX_DISCOVERY_CACHE_ENTRIES = 100
-DEFAULT_DISCOVERY_CACHE_TTL = 5
-DEFAULT_DISCOVERY_EXCHANGE = "msc.discovery"
-REGEX_FQN_PATTERN = r"^(((([A-Za-z0-9-_]+){1,63}\.)+){1,255})+(([A-Za-z0-9-_]+){1,63})$"
+MAX_DISCOVERY_CACHE_ENTRIES = os.environ.get("MAX_DISCOVERY_CACHE_ENTRIES", 100)
+DISCOVERY_CACHE_TTL = os.environ.get("DISCOVERY_CACHE_TTL", 5)
+DATA_EXCHANGE_NAME = os.environ.get("DISCOVERY_EXCHANGE_NAME", "data")
+DISCOVERY_EXCHANGE_NAME = os.environ.get("DISCOVERY_EXCHANGE_NAME", "msc.discovery")
+REGEX_FQN_PATTERN = r"^(?:[A-Za-z0-9-_]{1,63}\.){1,255}[A-Za-z0-9-_]{1,63}$"
 
 
 def broker_fqn(domain, stype, sid, item=None):
@@ -89,8 +91,8 @@ class AmqBrokerConnector:
         service_id,
         keep_alive_seconds=False,
         keep_alive_listen=False,
-        discovery_cache_ttl=DEFAULT_DISCOVERY_CACHE_TTL,
-        discovery_exchange=DEFAULT_DISCOVERY_EXCHANGE,
+        discovery_cache_ttl=DISCOVERY_CACHE_TTL,
+        discovery_exchange=DISCOVERY_EXCHANGE_NAME,
     ):
         if not re.match(
             REGEX_FQN_PATTERN, broker_fqn(service_domain, service_type, service_id)
@@ -108,12 +110,13 @@ class AmqBrokerConnector:
         self._rpc_server_exchange_name = (
             f"{service_domain}.api.{service_type}.{service_id}"
         )
-        self._data_exchange_name = f"{service_domain}.daq.data"
+        self._data_exchange_name = f"{service_domain}.{DATA_EXCHANGE_NAME}"
         self._subscriber_name = broker_fqn(
             service_domain, service_type, service_id, "subscriber"
         )
         self._broker_conn = None
         self._data_exchange = None
+        self._discovery_exchange = None
         self._scheduler = None
         self._discovery_cache = None
 
@@ -143,11 +146,11 @@ class AmqBrokerConnector:
     def fqn(self):
         return broker_fqn(self._service_domain, self._service_type, self._service_id)
 
-    async def open(self, timeout=None):
+    async def open(self, **kwargs: Any):
         self._broker_conn = await connect_robust(
             url=self._amqp_uri,
             client_properties={"connection_name": "rpc_srv"},
-            timeout=timeout,
+            **kwargs,
         )
 
         # This will create the exchange if it doesn't already exist.
@@ -278,23 +281,22 @@ class AmqBrokerConnector:
 
     # --- Data routines ---
 
-    def publish_data(self, items, headers):
-        arguments = headers
-        arguments["service_id"] = self._service_id
-        arguments["service_type"] = self._service_type
+    def publish_data(self, data, headers):
+        headers["service_id"] = self._service_id
+        headers["service_type"] = self._service_type
 
         aio.create_task(
             self._data_exchange.publish(
                 message=Message(
-                    body=json.dumps(items, sort_keys=True, default=str).encode(),
-                    headers=arguments,
+                    body=data,
+                    headers=headers,
                 ),
                 routing_key="",
             )
         )
 
         log.debug(
-            f"{items} sent to exchange {self._data_exchange_name} with headers: {headers}"
+            f"Total {len(data)} bytes published to exchange {self._data_exchange_name} with headers: {headers}"
         )
 
     async def subscribe_data(self, subscriber_name, headers, callback):

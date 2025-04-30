@@ -8,10 +8,7 @@
     - https://docs.pytest.org/en/stable/writing_plugins.html
 """
 
-import asyncio
 import os
-
-import pytest
 
 AMQP_URL = os.environ.get("AMQP_URL", "amqp://guest:guest@localhost/")
 SERVICE_ID = os.environ.get("SERVICE_ID", "amqp-fabric")
@@ -21,10 +18,3 @@ RPC_EXCHANGE_NAME = os.environ.get(
     "RPC_EXCHANGE_NAME", f"{SERVICE_DOMAIN}.api.{SERVICE_TYPE}.{SERVICE_ID}"
 )
 DATA_EXCHANGE_NAME = os.environ.get("DATA_EXCHANGE_NAME", f"{SERVICE_DOMAIN}.daq.data")
-
-
-@pytest.fixture
-def event_loop():
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
