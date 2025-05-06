@@ -60,7 +60,7 @@ class JsonGZipRPC(CustomJsonRPC):
 MSG_TYPE_KEEP_ALIVE = "keep_alive"
 MAX_DISCOVERY_CACHE_ENTRIES = os.environ.get("MAX_DISCOVERY_CACHE_ENTRIES", 100)
 DISCOVERY_CACHE_TTL = os.environ.get("DISCOVERY_CACHE_TTL", 5)
-DATA_EXCHANGE_NAME = os.environ.get("DISCOVERY_EXCHANGE_NAME", "data")
+DATA_EXCHANGE_NAME = os.environ.get("DATA_EXCHANGE_NAME", "data")
 DISCOVERY_EXCHANGE_NAME = os.environ.get("DISCOVERY_EXCHANGE_NAME", "msc.discovery")
 REGEX_FQN_PATTERN = r"^(?:[A-Za-z0-9-_]{1,63}\.){1,255}[A-Za-z0-9-_]{1,63}$"
 
