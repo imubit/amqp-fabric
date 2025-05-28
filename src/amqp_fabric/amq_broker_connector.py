@@ -176,15 +176,6 @@ class AmqBrokerConnector:
         self._broker_conn.reconnect_callbacks.add(self._on_reconnect)
 
         await self._on_reconnect()
-        channel = await self._broker_conn.channel()
-
-        self._data_exchange = await channel.declare_exchange(
-            name=self._data_exchange_name, type=ExchangeType.HEADERS, durable=True
-        )
-        self._discovery_exchange = await channel.declare_exchange(
-            name=self._discovery_exchange_name, type=ExchangeType.HEADERS, durable=True
-        )
-
         await aio.sleep(0.1)
 
         # Initialize keep-alive messages
@@ -349,6 +340,7 @@ class AmqBrokerConnector:
                     message=Message(body="".encode(), headers=headers), routing_key=""
                 )
             )
+
         except Exception as e:
             log.error(e)
 
