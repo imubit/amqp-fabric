@@ -315,3 +315,49 @@ async def test_publish_data():
 
     await srv_conn.close()
     await client_conn.close()
+
+
+@pytest.mark.asyncio
+async def test_reconnects():
+    api = TestApi()
+
+    srv_conn = AmqBrokerConnector(
+        amqp_uri=AMQP_URL,
+        service_domain=SERVICE_DOMAIN,
+        service_type=SERVICE_TYPE,
+        service_id=SERVICE_ID,
+        keep_alive_seconds=2,
+    )
+    await srv_conn.open()
+
+    assert len(srv_conn._broker_conn.close_callbacks) == 1
+
+    assert srv_conn.fqn == f"{SERVICE_DOMAIN}.{SERVICE_TYPE}.{SERVICE_ID}"
+    assert srv_conn.service_id == SERVICE_ID
+    assert srv_conn.service_type == SERVICE_TYPE
+    assert srv_conn.domain == SERVICE_DOMAIN
+    assert srv_conn.data_exchange == f"{SERVICE_DOMAIN}.data"
+
+    # Init server
+    await srv_conn.rpc_register(api)
+
+    # Init client
+    client_conn = AmqBrokerConnector(
+        amqp_uri=AMQP_URL,
+        service_domain=SERVICE_DOMAIN,
+        service_type="client",
+        service_id="client",
+    )
+    await client_conn.open()
+
+    proxy = await client_conn.rpc_proxy(
+        service_domain=SERVICE_DOMAIN,
+        service_id=SERVICE_ID,
+        service_type=SERVICE_TYPE,
+    )
+
+    assert await proxy.multiply(x=100, y=2)
+    assert srv_conn._scheduler
+
+    await srv_conn._broker_conn.close()
+    await client_conn.close()

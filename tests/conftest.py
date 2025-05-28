@@ -17,4 +17,4 @@ SERVICE_DOMAIN = os.environ.get("SERVICE_DOMAIN", "some-domain")
 RPC_EXCHANGE_NAME = os.environ.get(
     "RPC_EXCHANGE_NAME", f"{SERVICE_DOMAIN}.api.{SERVICE_TYPE}.{SERVICE_ID}"
 )
-DATA_EXCHANGE_NAME = os.environ.get("DATA_EXCHANGE_NAME", f"{SERVICE_DOMAIN}.daq.data")
+DATA_EXCHANGE_NAME = os.environ.get("DATA_EXCHANGE_NAME", f"{SERVICE_DOMAIN}.data")
