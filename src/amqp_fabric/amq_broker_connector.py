@@ -153,15 +153,23 @@ class AmqBrokerConnector:
         return broker_fqn(self._service_domain, self._service_type, self._service_id)
 
     async def _on_reconnect(self, connection=None):
-        # This will create the exchange if it doesn't already exist.
-        channel = await self._broker_conn.channel()
+        try:
+            # This will create the exchange if it doesn't already exist.
+            channel = await self._broker_conn.channel()
 
-        self._data_exchange = await channel.declare_exchange(
-            name=self._data_exchange_name, type=ExchangeType.HEADERS, durable=True
-        )
-        self._discovery_exchange = await channel.declare_exchange(
-            name=self._discovery_exchange_name, type=ExchangeType.HEADERS, durable=True
-        )
+            self._data_exchange = await channel.declare_exchange(
+                name=self._data_exchange_name, type=ExchangeType.HEADERS, durable=True
+            )
+            self._discovery_exchange = await channel.declare_exchange(
+                name=self._discovery_exchange_name,
+                type=ExchangeType.HEADERS,
+                durable=True,
+            )
+            log.info("Connected to broker.")
+
+        except Exception as e:
+            log.error("Error reconnecting....")
+            log.error(e)
 
     async def open(self, **kwargs: Any):
         self._broker_conn = await connect_robust(
