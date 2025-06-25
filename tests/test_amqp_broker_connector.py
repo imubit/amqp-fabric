@@ -2,10 +2,12 @@ import asyncio
 import datetime as dt
 import json
 
+import aiomisc
 import pytest
 from aio_pika import IncomingMessage, connect_robust
-from aio_pika.exceptions import MessageProcessError
+from aio_pika.exceptions import CONNECTION_EXCEPTIONS, MessageProcessError
 from aio_pika.patterns.rpc import JsonRPCError
+from aiomisc_pytest import TCPProxy
 from conftest import (
     AMQP_URL,
     RPC_EXCHANGE_NAME,
@@ -315,3 +317,68 @@ async def test_publish_data():
 
     await srv_conn.close()
     await client_conn.close()
+
+
+@aiomisc.timeout(30)
+@pytest.mark.asyncio
+async def test_server_reconnects(proxy: TCPProxy):
+    api = TestApi()
+
+    amqp_url = f"amqp://guest:guest@{proxy.proxy_host}:{proxy.proxy_port}/"
+    reconnect_event = asyncio.Event()
+
+    srv_conn = AmqBrokerConnector(
+        amqp_uri=amqp_url,
+        service_domain=SERVICE_DOMAIN,
+        service_type=SERVICE_TYPE,
+        service_id=SERVICE_ID,
+        keep_alive_seconds=2,
+    )
+    await srv_conn.open()
+
+    srv_conn._broker_conn.reconnect_callbacks.add(
+        lambda *_: reconnect_event.set(),
+    )
+
+    assert srv_conn.fqn == f"{SERVICE_DOMAIN}.{SERVICE_TYPE}.{SERVICE_ID}"
+    assert srv_conn.service_id == SERVICE_ID
+    assert srv_conn.service_type == SERVICE_TYPE
+    assert srv_conn.domain == SERVICE_DOMAIN
+    assert srv_conn.data_exchange == f"{SERVICE_DOMAIN}.data"
+
+    # Init server
+    await srv_conn.rpc_register(api)
+
+    # Init client
+    client_conn = AmqBrokerConnector(
+        amqp_uri=AMQP_URL,
+        service_domain=SERVICE_DOMAIN,
+        service_type="client",
+        service_id="client",
+    )
+    await client_conn.open()
+
+    rpc_proxy = await client_conn.rpc_proxy(
+        service_domain=SERVICE_DOMAIN,
+        service_id=SERVICE_ID,
+        service_type=SERVICE_TYPE,
+    )
+
+    assert await rpc_proxy.multiply(x=100, y=2)
+    assert srv_conn._scheduler
+
+    # Disconnect existing client
+    await proxy.disconnect_all()
+
+    with pytest.raises(CONNECTION_EXCEPTIONS):
+        await rpc_proxy.multiply(x=100, y=2)
+
+    # Wait for reconnect
+    await asyncio.wait_for(reconnect_event.wait(), timeout=10)
+    #
+    # # Test RPC again
+    # await rpc_proxy.multiply(x=100, y=2)
+    #
+    await client_conn.close()
+
+    await srv_conn._broker_conn.close()

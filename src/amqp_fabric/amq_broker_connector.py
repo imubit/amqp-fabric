@@ -57,11 +57,17 @@ class JsonGZipRPC(CustomJsonRPC):
         return super().deserialize(gzip.decompress(data))
 
 
+BROKER_RECONNECT_RETRY_DELAY = os.environ.get(
+    "AMQFAB_BROKER_RECONNECT_RETRY_DELAY", 5.0
+)
+BROKER_HEARTBEAT = os.environ.get("AMQFAB_BROKER_HEARTBEAT", 60)
 MSG_TYPE_KEEP_ALIVE = "keep_alive"
-MAX_DISCOVERY_CACHE_ENTRIES = os.environ.get("MAX_DISCOVERY_CACHE_ENTRIES", 100)
-DISCOVERY_CACHE_TTL = os.environ.get("DISCOVERY_CACHE_TTL", 5)
-DATA_EXCHANGE_NAME = os.environ.get("DATA_EXCHANGE_NAME", "data")
-DISCOVERY_EXCHANGE_NAME = os.environ.get("DISCOVERY_EXCHANGE_NAME", "msc.discovery")
+MAX_DISCOVERY_CACHE_ENTRIES = os.environ.get("AMQFAB_MAX_DISCOVERY_CACHE_ENTRIES", 100)
+DISCOVERY_CACHE_TTL = os.environ.get("AMQFAB_DISCOVERY_CACHE_TTL", 5)
+DATA_EXCHANGE_NAME = os.environ.get("AMQFAB_DATA_EXCHANGE_NAME", "data")
+DISCOVERY_EXCHANGE_NAME = os.environ.get(
+    "AMQFAB_DISCOVERY_EXCHANGE_NAME", "msc.discovery"
+)
 REGEX_FQN_PATTERN = r"^(?:[A-Za-z0-9-_]{1,63}\.){1,255}[A-Za-z0-9-_]{1,63}$"
 
 
@@ -126,6 +132,8 @@ class AmqBrokerConnector:
         self._keepalive_subscriber_service_type = None
         self._keepalive_subscriber_service_id = None
 
+        self._api = None
+
     @property
     def domain(self):
         return self._service_domain
@@ -146,22 +154,42 @@ class AmqBrokerConnector:
     def fqn(self):
         return broker_fqn(self._service_domain, self._service_type, self._service_id)
 
+    async def _on_reconnect(self, connection=None):
+        try:
+            # This will create the exchange if it doesn't already exist.
+            channel = await self._broker_conn.channel()
+
+            self._data_exchange = await channel.declare_exchange(
+                name=self._data_exchange_name, type=ExchangeType.HEADERS, durable=True
+            )
+            self._discovery_exchange = await channel.declare_exchange(
+                name=self._discovery_exchange_name,
+                type=ExchangeType.HEADERS,
+                durable=True,
+            )
+
+            log.info(f"Service '{self.fqn}' connected to broker.")
+
+            if self._api:
+                await self.rpc_register(self._api)
+
+        except Exception as e:
+            log.error("Error reconnecting....")
+            log.error(e)
+
     async def open(self, **kwargs: Any):
         self._broker_conn = await connect_robust(
             url=self._amqp_uri,
             client_properties={"connection_name": "rpc_srv"},
+            connection_attempts=None,  # None means infinite retries
+            retry_delay=BROKER_RECONNECT_RETRY_DELAY,  # wait 5 s between attempts
+            heartbeat=BROKER_HEARTBEAT,  # send heartbeats every minute
             **kwargs,
         )
 
-        # This will create the exchange if it doesn't already exist.
-        channel = await self._broker_conn.channel()
+        self._broker_conn.reconnect_callbacks.add(self._on_reconnect)
 
-        self._data_exchange = await channel.declare_exchange(
-            name=self._data_exchange_name, type=ExchangeType.HEADERS, durable=True
-        )
-        self._discovery_exchange = await channel.declare_exchange(
-            name=self._discovery_exchange_name, type=ExchangeType.HEADERS, durable=True
-        )
+        await self._on_reconnect()
         await aio.sleep(0.1)
 
         # Initialize keep-alive messages
@@ -183,6 +211,8 @@ class AmqBrokerConnector:
 
         # Initialize keep-alive listener
         if self._keep_alive_listen:
+            channel = await self._broker_conn.channel()
+
             self._discovery_cache = TTLCache(
                 maxsize=MAX_DISCOVERY_CACHE_ENTRIES, ttl=self._discovery_cache_ttl
             )
@@ -203,11 +233,14 @@ class AmqBrokerConnector:
             self._scheduler.shutdown(wait=True)
             self._scheduler = None
 
+        self._api = None
         await self._broker_conn.close()
 
     # --- Service management routines ---
 
     async def rpc_register(self, api):
+        self._api = api
+
         # Creating channel
         channel = await self._broker_conn.channel()
         await channel.set_qos(prefetch_count=1)
@@ -225,9 +258,7 @@ class AmqBrokerConnector:
                 await rpc.register(api_name, awaitify(callee), auto_delete=True)
 
         log.info(
-            'RPC Server Registered on Exchange "{}"'.format(
-                self._rpc_server_exchange_name
-            )
+            f'RPC Server Registered on Exchange "{self._rpc_server_exchange_name}"'
         )
 
     async def rpc_proxy(self, service_domain, service_id, service_type):
@@ -311,19 +342,21 @@ class AmqBrokerConnector:
         await queue.consume(callback)
 
     async def _on_send_keep_alive(self):
-        try:
-            headers = {
-                "msg_type": MSG_TYPE_KEEP_ALIVE,
-                "service_domain": self._service_domain,
-                "service_id": self._service_id,
-                "service_type": self._service_type,
-            }
+        headers = {
+            "msg_type": MSG_TYPE_KEEP_ALIVE,
+            "service_domain": self._service_domain,
+            "service_id": self._service_id,
+            "service_type": self._service_type,
+        }
 
-            aio.create_task(
-                self._discovery_exchange.publish(
-                    message=Message(body="".encode(), headers=headers), routing_key=""
-                )
+        task = aio.create_task(
+            self._discovery_exchange.publish(
+                message=Message(body="".encode(), headers=headers), routing_key=""
             )
+        )
+
+        try:
+            await task  # Exception is raised here
         except Exception as e:
             log.error(e)
 
@@ -359,7 +392,8 @@ class AmqBrokerConnector:
                         or headers["service_id"] == self._keepalive_service_service_id
                     )
                 ):
-                    aio.create_task(self._keepalive_subscriber_callback(headers))
+                    task = aio.create_task(self._keepalive_subscriber_callback(headers))
+                    await task  # Exception is raised here
 
         except Exception as e:
             log.error(e)
