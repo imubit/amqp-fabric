@@ -216,6 +216,8 @@ class AmqBrokerConnector:
             channel, auto_delete=True, exchange=self._rpc_server_exchange_name
         )
 
+        await aio.sleep(0.1)
+
         for api_name in dir(api):
             callee = getattr(api, api_name)
             if isinstance(callee, MethodType) and not api_name.startswith("_"):
