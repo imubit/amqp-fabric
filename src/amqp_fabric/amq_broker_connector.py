@@ -132,6 +132,8 @@ class AmqBrokerConnector:
         self._keepalive_subscriber_service_type = None
         self._keepalive_subscriber_service_id = None
 
+        self._api = None
+
     @property
     def domain(self):
         return self._service_domain
@@ -165,7 +167,11 @@ class AmqBrokerConnector:
                 type=ExchangeType.HEADERS,
                 durable=True,
             )
-            log.info("Connected to broker.")
+
+            log.info(f"Service '{self.fqn}' connected to broker.")
+
+            if self._api:
+                await self.rpc_register(self._api)
 
         except Exception as e:
             log.error("Error reconnecting....")
@@ -227,11 +233,14 @@ class AmqBrokerConnector:
             self._scheduler.shutdown(wait=True)
             self._scheduler = None
 
+        self._api = None
         await self._broker_conn.close()
 
     # --- Service management routines ---
 
     async def rpc_register(self, api):
+        self._api = api
+
         # Creating channel
         channel = await self._broker_conn.channel()
         await channel.set_qos(prefetch_count=1)
@@ -249,9 +258,7 @@ class AmqBrokerConnector:
                 await rpc.register(api_name, awaitify(callee), auto_delete=True)
 
         log.info(
-            'RPC Server Registered on Exchange "{}"'.format(
-                self._rpc_server_exchange_name
-            )
+            f'RPC Server Registered on Exchange "{self._rpc_server_exchange_name}"'
         )
 
     async def rpc_proxy(self, service_domain, service_id, service_type):
@@ -335,20 +342,21 @@ class AmqBrokerConnector:
         await queue.consume(callback)
 
     async def _on_send_keep_alive(self):
-        try:
-            headers = {
-                "msg_type": MSG_TYPE_KEEP_ALIVE,
-                "service_domain": self._service_domain,
-                "service_id": self._service_id,
-                "service_type": self._service_type,
-            }
+        headers = {
+            "msg_type": MSG_TYPE_KEEP_ALIVE,
+            "service_domain": self._service_domain,
+            "service_id": self._service_id,
+            "service_type": self._service_type,
+        }
 
-            aio.create_task(
-                self._discovery_exchange.publish(
-                    message=Message(body="".encode(), headers=headers), routing_key=""
-                )
+        task = aio.create_task(
+            self._discovery_exchange.publish(
+                message=Message(body="".encode(), headers=headers), routing_key=""
             )
+        )
 
+        try:
+            await task  # Exception is raised here
         except Exception as e:
             log.error(e)
 
@@ -384,7 +392,8 @@ class AmqBrokerConnector:
                         or headers["service_id"] == self._keepalive_service_service_id
                     )
                 ):
-                    aio.create_task(self._keepalive_subscriber_callback(headers))
+                    task = aio.create_task(self._keepalive_subscriber_callback(headers))
+                    await task  # Exception is raised here
 
         except Exception as e:
             log.error(e)
